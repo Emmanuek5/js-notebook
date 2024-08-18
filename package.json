@@ -1,0 +1,29 @@
+{
+  "name": "code-notebook",
+  "module": "src/index.ts",
+  "type": "module",
+  "dependencies": {
+    "@tensorflow/tfjs": "^4.2.0",
+    "@tensorflow/tfjs-node": "^4.20.0",
+    "@tensorflow/tfjs-vis": "^1.5.1",
+    "@types/uuid": "^10.0.0",
+    "acorn": "^8.12.1",
+    "arquero": "^5.1.0",
+    "d3": "^7.9.0",
+    "danfojs-node": "^1.1.2",
+    "lodash": "^4.17.21",
+    "node-pty": "^1.0.0",
+    "readline": "^1.3.0",
+    "ts-node": "^10.9.1",
+    "uuid": "^10.0.0",
+    "vm2": "^3.9.19"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.6",
+    "@types/node": "^22.4.0",
+    "typescript": "^5.0.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

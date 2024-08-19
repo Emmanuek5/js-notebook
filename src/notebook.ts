@@ -6,6 +6,7 @@ import { NotebookEnvironment } from './notebook-environment';
 import { Cell } from './cell';
 import { execSync } from 'child_process';
 import { performance } from 'perf_hooks';
+import si from 'systeminformation';
 
 type CellOutput = {
     type: 'text' | 'error' | 'html' | 'image' | 'table' | 'plot' | 'loader' | 'stream';
@@ -20,6 +21,7 @@ export class Notebook {
     private environment: NotebookEnvironment;
     private id: string;
     private progressIndicator: ProgressIndicator;
+
 
     private installedPackages: Set<string> = new Set();
 
@@ -85,33 +87,73 @@ export class Notebook {
         this.log(`Created new cell with ID: ${cell.getId()}`, '📝');
         return cell.getId();
     }
-
+ 
     async executeCell(cellId: string): Promise<any> {
         const cell = this.cells.find(c => c.getId() === cellId);
         if (!cell) {
             throw new Error(`Cell with id "${cellId}" not found`);
         }
 
-        this.progressIndicator.start(`Executing cell ${cellId}`);
-        const startTime = performance.now(); // Start timing execution
+        // Start performance monitoring
+        const startMetrics = await this.collectPerformanceMetrics();
 
-        let result;
+        this.progressIndicator.start(`Executing cell ${cellId}`);
+        const startTime = performance.now();
+
         try {
-            result = await cell.execute(this.environment);
-            const endTime = performance.now(); // End timing execution
+            const result = await cell.execute(this.environment);
+            const endTime = performance.now();
+            const endMetrics = await this.collectPerformanceMetrics();  // Collect metrics after execution
+
+            // Calculate execution time and log performance
             const executionTime = endTime - startTime;
+            this.log(`Execution time for cell ${cellId}: ${executionTime.toFixed(2)} ms`);
+            this.logPerformanceData(cellId, startTime, endTime, startMetrics, endMetrics);
+
+            // Store performance data in the cell
+            cell.setPerformanceData({
+                startTime,
+                endTime,
+                executionTime,
+                startMetrics,
+                endMetrics,
+            });
 
             this.progressIndicator.stop(`Cell ${cellId} executed successfully`);
-
-            // Save logs and usage data
-            await this.saveExecutionData(cellId, executionTime);
+            return result;
         } catch (error) {
             this.progressIndicator.stop('Failed to execute cell');
-            await this.saveExecutionData(cellId, 0, error); // Save logs with error if execution failed
             throw error;
         }
+    }
+    async collectPerformanceMetrics() {
+        // This function collects CPU, Memory and Disk usage
+        const cpuUsage = await si.currentLoad();
+        const memoryUsage = await si.mem();
+        const diskUsage = await si.fsSize();
+        return {
+            cpuLoad: cpuUsage.currentLoad,
+            usedMemory: memoryUsage.used,
+            totalMemory: memoryUsage.total,
+            diskInfo: diskUsage.map(disk => ({
+                fs: disk.fs,
+                type: disk.type,
+                used: disk.used,
+                size: disk.size
+            }))
+        };
+    }
 
-        return result;
+    private async logPerformanceData(cellId: string, startTime: number, endTime: number, startMetrics: any, endMetrics: any) {
+        const executionTime = endTime - startTime;
+        const performanceData = {
+            cellId,
+            executionTime,
+            startMetrics,
+            endMetrics,
+            timestamp: new Date().toISOString(),
+        };
+        console.log(`Performance data: ${JSON.stringify(performanceData)}`);
     }
 
     private async saveExecutionData(cellId: string, executionTime: number, error: any = null) {
@@ -156,6 +198,35 @@ export class Notebook {
         }
     }
 
+    async saveState(filePath: string) {
+        const stateData = {
+            id: this.id,
+            cells: this.cells.map(cell => ({
+                id: cell.getId(),
+                kernelName: cell.getKernelName(),
+                content: cell.content,
+                outputs: cell.getOutputs()
+            })),
+            environment: this.environment.getEnvs()  // Assuming getEnvs returns current environment settings
+        };
+        await writeFile(filePath, JSON.stringify(stateData, null, 2));
+        this.log('Notebook state saved to ' + filePath);
+    }
+
+    async loadState(filePath: string) {
+        const stateData = JSON.parse(await readFile(filePath, 'utf-8'));
+        this.id = stateData.id;
+        this.cells = stateData.cells.map((cellData: any) => {
+            const kernel = this.kernels.get(cellData.kernelName);
+            if (!kernel) {
+                throw new Error(`Kernel "${cellData.kernelName}" not found`);
+            }
+            return new Cell(cellData.content, kernel, cellData.id);
+        });
+        this.environment.setEnvs(stateData.environment);  // Assuming setEnvs sets environment variables
+        this.log('Notebook state loaded from ' + filePath);
+    }
+    
     async saveNotebook(filePath: string) {
         const notebookData = {
             id: this.id,
@@ -171,6 +242,7 @@ export class Notebook {
                     content: output.content,
                     metadata: output.metadata,
                 })),
+                performanceData: cell.getPerformanceData(),  // Include performance data here
             })),
         };
 
@@ -178,11 +250,12 @@ export class Notebook {
         this.log(`Notebook saved to ${filePath}`, '💾');
     }
 
+
     async loadNotebook(filePath: string) {
         const notebookData = JSON.parse(await readFile(filePath, 'utf-8'));
 
         this.id = notebookData.id;
-        this.cells = notebookData.cells.map((cellData:any) => {
+        this.cells = notebookData.cells.map((cellData: any) => {
             const kernel = this.kernels.get(cellData.kernel);
             if (!kernel) {
                 throw new Error(`Kernel "${cellData.kernel}" not found`);

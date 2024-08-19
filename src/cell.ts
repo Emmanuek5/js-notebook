@@ -10,6 +10,7 @@ type CellOutput = {
 export class Cell {
     private id: string;
     private outputs: CellOutput[] = [];
+    private performanceData: any = null;
 
     constructor(
         public content: string,
@@ -25,6 +26,14 @@ export class Cell {
 
     getKernelName(): any {
         return this.kernel.getName();
+    }
+
+    setPerformanceData(performanceData: any) {
+        this.performanceData = performanceData;
+    }
+
+    getPerformanceData() {
+        return this.performanceData;
     }
 
     async execute(env: NotebookEnvironment): Promise<void> {

@@ -1,6 +1,5 @@
 import { Notebook } from './notebook';
 import { JavaScriptKernel } from './kernels/javascript';
-import { TypeScriptKernel } from './kernels/typescript';
 import { ShellKernel } from './kernels/shell';
 
 async function main() {
@@ -53,7 +52,6 @@ console.log(df.toString()); // Depending on your implementation, this might not 
   await notebook.executeCell(jsCell2);
   await notebook.executeCell(jsCell3);
   await notebook.executeCell(danfoCellId);  // Execute the danfo.js cell
-
   await notebook.saveNotebook('my_notebook.json');
 }
 

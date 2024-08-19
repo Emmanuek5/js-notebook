@@ -15,6 +15,12 @@ export class JavaScriptKernel implements Kernel {
     constructor() {
         this.initializeAILibraries();
     }
+    initialize(): Promise<void> {
+        throw new Error('Method not implemented.');
+    }
+    shutdown(): Promise<void> {
+        throw new Error('Method not implemented.');
+    }
 
     private async initializeAILibraries() {
         try {

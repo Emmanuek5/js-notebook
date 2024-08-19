@@ -3,6 +3,12 @@ import { NotebookEnvironment } from '@/notebook-environment';
 import path from 'path';
 
 export class ShellKernel implements Kernel {
+    initialize(): Promise<void> {
+        throw new Error('Method not implemented.');
+    }
+    shutdown(): Promise<void> {
+        throw new Error('Method not implemented.');
+    }
     private forbiddenCommands: string[] = [
         'rm', 'mv', 'cp', 'chmod', 'chown', 'sudo', 'su',
         'wget', 'curl', 'ping', 'nmap', 'nc', 'netcat'

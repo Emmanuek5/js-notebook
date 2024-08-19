@@ -35,6 +35,10 @@ export class NotebookEnvironment {
         return { ...this.envVars };
     }
 
+    setEnvs(envs: Record<string, string>) {
+        this.envVars = envs;
+    }
+
     async writeFile(filename: string, content: string) {
         const filePath = join(this.directory, filename);
         await writeFile(filePath, content);

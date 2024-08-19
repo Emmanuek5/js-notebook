@@ -26,6 +26,9 @@ export class TypeScriptKernel implements Kernel {
         /fs\s*\.\s*(writeFile|unlink|rmdir|mkdir)/,
     ];
 
+    public getName() { 
+        return 'TypeScript';
+    }
     async execute(code: string, env: NotebookEnvironment): Promise<any> {
         // Validate code content
         this.validateCodeContent(code);

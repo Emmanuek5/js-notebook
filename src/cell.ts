@@ -23,6 +23,10 @@ export class Cell {
         return this.id;
     }
 
+    getKernelName(): any {
+        return this.kernel.getName();
+    }
+
     async execute(env: NotebookEnvironment): Promise<void> {
         this.clearOutputs();
         this.addOutput({ type: 'loader', content: 'Executing cell...' });
@@ -77,9 +81,28 @@ export class Cell {
         );
     }
 
-    private addOutput(output: CellOutput): void {
+    addOutput(output: CellOutput): void {
         this.outputs.push(output);
         this.renderOutput(output);
+    }
+
+    // Methods to help with serialization/deserialization
+    toJSON(): any {
+        return {
+            id: this.id,
+            content: this.content,
+            outputs: this.outputs.map(output => ({
+                type: output.type,
+                content: output.content,
+                metadata: output.metadata,
+            })),
+        };
+    }
+
+    static fromJSON(data: any, kernel: Kernel): Cell {
+        const cell = new Cell(data.content, kernel, data.id);
+        data.outputs.forEach((output: CellOutput) => cell.addOutput(output));
+        return cell;
     }
 
     private renderOutput(output: CellOutput): void {

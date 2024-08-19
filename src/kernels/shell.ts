@@ -8,6 +8,9 @@ export class ShellKernel implements Kernel {
         'wget', 'curl', 'ping', 'nmap', 'nc', 'netcat'
     ];
 
+    public getName() { 
+        return 'Shell';
+    }
     async execute(command: string, env: NotebookEnvironment): Promise<string> {
         this.validateCommand(command);
 

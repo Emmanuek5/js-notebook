@@ -9,74 +9,52 @@ async function main() {
 
   // Register kernels
   const jsKernel = new JavaScriptKernel();
-
-  notebook.registerKernel('javascript', jsKernel)
+  notebook.registerKernel('javascript', jsKernel);
   notebook.addEnvs({
     SOME_NOTEBOOK_SPECIFIC_VAR: "dwedewd"
-  })
+  });
 
-
-
+  // Create cells
   const jsCellId = await notebook.createCell('javascript', `
-    const {tf} = require('node-kernel');
+global.myArray = [1, 2, 3];
+console.log('This is a simple log.');
+    `);
 
-    // Create synthetic data for training
-    const createSyntheticData = () => {
-      const inputs = [];
-      const labels = [];
-      for (let i = 0; i < 1000; i++) {
-        const x = Math.random();
-        const y = x * 2 + Math.random() * 0.1;  // Linear relation with some noise
-        inputs.push([x]);
-        labels.push([y]);
-      }
-      return { inputs: tf.tensor2d(inputs), labels: tf.tensor2d(labels) };
-    };
+  const jsCell2 = await notebook.createCell('javascript', `
+global.myArray; // This might render as a table
+    `);
 
-    // Define a simple linear model
-    const createModel = () => {
-      const model = tf.sequential();
-      model.add(tf.layers.dense({ units: 1, inputShape: [1] }));
-      model.compile({
-        optimizer: 'sgd',
-        loss: 'meanSquaredError'
-      });
-      return model;
-    };
+  const jsCell3 = await notebook.createCell('javascript', `
+console.log('A simple string output.'); // This should render as plain text
+    `);
 
-    // Train the model
-    const trainModel = async (model, inputs, labels) => {
-      await model.fit(inputs, labels, {
-        epochs: 100,
-        callbacks: {
-          onEpochEnd: (epoch, logs) => {
-            console.log(\`Epoch \${epoch + 1}: loss = \${logs.loss.toFixed(4)}\`);
-          }
-        }
-      });
-    };
+  // Cell that creates and displays a table with danfo.js
+  const danfoCellId = await notebook.createCell('javascript', `
+const { dfd } = require('node-kernel'); // Assuming 'node-kernel' is the way you load your bundled libraries
 
-    // Main execution
-    (async () => {
-      const { inputs, labels } = createSyntheticData();
-      const model = createModel();
+// Create a simple DataFrame
+const data = {
+    'Name': ['Alice', 'Bob', 'Charlie'],
+    'Age': [25, 30, 35],
+    'City': ['New York', 'Los Angeles', 'Chicago']
+};
+const df = new dfd.DataFrame(data);
 
-      console.log('Training model...');
-      await trainModel(model, inputs, labels);
+// Printing to console
+console.log(df.toString()); // Depending on your implementation, this might not render as a visual table in the notebook
 
-      // Test the model with a new input
-      const testInput = tf.tensor2d([[0.5]]);
-      const prediction = model.predict(testInput);
-      prediction.print();
-    })();
-`);
-
-
+// Optionally, use df.plot if your environment supports it
+// df.plot('table').render(); // Uncomment if plots can be handled
+    `);
 
   // Execute cells
   console.log("Executing JavaScript cell:");
   await notebook.executeCell(jsCellId);
+  await notebook.executeCell(jsCell2);
+  await notebook.executeCell(jsCell3);
+  await notebook.executeCell(danfoCellId);  // Execute the danfo.js cell
 
+  await notebook.saveNotebook('my_notebook.json');
 }
 
 main().catch(console.error);

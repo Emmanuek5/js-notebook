@@ -7,6 +7,13 @@ import { Cell } from './cell';
 import { execSync } from 'child_process';
 import { performance } from 'perf_hooks';
 
+type CellOutput = {
+    type: 'text' | 'error' | 'html' | 'image' | 'table' | 'plot' | 'loader' | 'stream';
+    content: any;
+    metadata?: Record<string, any>;
+};
+
+
 export class Notebook {
     private cells: Cell[] = [];
     private kernels: Map<string, Kernel> = new Map();
@@ -147,6 +154,47 @@ export class Notebook {
             console.error(error);
             throw error;
         }
+    }
+
+    async saveNotebook(filePath: string) {
+        const notebookData = {
+            id: this.id,
+            metadata: {
+                created: new Date().toISOString(),
+            },
+            cells: this.cells.map(cell => ({
+                id: cell.getId(),
+                kernel: cell.getKernelName(),
+                content: cell.content,
+                outputs: cell.getOutputs().map(output => ({
+                    type: output.type,
+                    content: output.content,
+                    metadata: output.metadata,
+                })),
+            })),
+        };
+
+        await writeFile(filePath, JSON.stringify(notebookData, null, 2));
+        this.log(`Notebook saved to ${filePath}`, '💾');
+    }
+
+    async loadNotebook(filePath: string) {
+        const notebookData = JSON.parse(await readFile(filePath, 'utf-8'));
+
+        this.id = notebookData.id;
+        this.cells = notebookData.cells.map((cellData:any) => {
+            const kernel = this.kernels.get(cellData.kernel);
+            if (!kernel) {
+                throw new Error(`Kernel "${cellData.kernel}" not found`);
+            }
+
+            const cell = new Cell(cellData.content, kernel, cellData.id);
+            cellData.outputs.forEach((output: CellOutput) => cell.addOutput(output));
+
+            return cell;
+        });
+
+        this.log(`Notebook loaded from ${filePath}`, '📂');
     }
 
     getInstalledPackages(): string[] {

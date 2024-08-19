@@ -9,6 +9,8 @@ export class JavaScriptKernel implements Kernel {
     private packageCache: Set<string> = new Set();
     private aiLibraries: { [key: string]: any } = {};
     private logs: string[] = [];
+    private sharedContext: { [key: string]: any } = {};  // Shared context for variables
+
 
     constructor() {
         this.initializeAILibraries();
@@ -24,8 +26,9 @@ export class JavaScriptKernel implements Kernel {
         }
     }
 
-
-
+    public getName() {
+        return 'JavaScript';
+    }
 
     private log(message: string, error?: any) {
         const logEntry = error ? `${message} ${error}` : message;
@@ -51,9 +54,17 @@ ${contextLines.map((line, i) => `${errorLine - 2 + i}: ${line}`).join('\n')}
         }
 
         const envVars = env.getEnvs();
+        const outputLogs: any[] = [];
+
+        // Override console to capture output
+        const sandboxConsole = {
+            log: (...args: any[]) => outputLogs.push(...args),
+            error: (...args: any[]) => outputLogs.push('Error: ' + args.join(' ')),
+            warn: (...args: any[]) => outputLogs.push('Warning: ' + args.join(' ')),
+        };
 
         const sandbox = {
-            console,
+            console: sandboxConsole,
             setTimeout,
             clearTimeout,
             setInterval,
@@ -63,13 +74,14 @@ ${contextLines.map((line, i) => `${errorLine - 2 + i}: ${line}`).join('\n')}
             writeFile: (filename: string, content: string) => env.writeFile(filename, content),
             readFile: (filename: string) => env.readFile(filename),
             require: (moduleName: string) => this.safeRequire(moduleName, env),
+            global: this.sharedContext,
             process: {
                 env: {
                     ...process.env,
                     ...envVars,
-                    TF_CPP_MIN_LOG_LEVEL: '2'  // Suppress TensorFlow info messages
-                }
-            }
+                    TF_CPP_MIN_LOG_LEVEL: '2', // Suppress TensorFlow info messages
+                },
+            },
         };
 
         const context = vm.createContext(sandbox);
@@ -77,60 +89,49 @@ ${contextLines.map((line, i) => `${errorLine - 2 + i}: ${line}`).join('\n')}
         const start = process.hrtime();
         try {
             const wrappedCode = `
-            (async () => {
-                try {
-                    ${code}
-                } catch (e) {
-                    if (e instanceof Error) {
-                        e.stack = e.stack.replace(new RegExp('^.+?\\n'), '');
-                        throw e;
-                    } else {
-                        throw new Error(String(e));
-                    }
+        (async () => {
+            try {
+                ${code}
+            } catch (e) {
+                if (e instanceof Error) {
+                    e.stack = e.stack.replace(new RegExp('^.+?\\n'), '');
+                    throw e;
+                } else {
+                    throw new Error(String(e));
                 }
-            })();
-        `;
+            }
+        })();
+    `;
 
             const script = new vm.Script(wrappedCode, { filename: 'user-code.js' });
             const result = await script.runInContext(context, {
                 timeout: 30000,
-                displayErrors: true
+                displayErrors: true,
             });
 
             const end = process.hrtime(start);
             const executionTime = (end[0] * 1000 + end[1] / 1e6).toFixed(3); // in milliseconds
 
             this.log(`Execution time: ${executionTime} ms`);
-            return result;
+
+            // Handling output based on type
+            if (Array.isArray(result) || typeof result === 'object') {
+                return result; // Return objects and arrays directly (possibly as tables)
+            } else if (typeof result === 'string') {
+                return result; // Return strings as plain text
+            } else {
+                return outputLogs.join('\n'); // Combine console logs and return them as plain text
+            }
         } catch (error: any) {
             this.log('Error executing JavaScript:', error);
-
-            if (error.stack) {
-                const stackLines = error.stack.split('\n');
-                const relevantStackLines = stackLines.filter((line: string) => line.includes('user-code.js'));
-
-                if (relevantStackLines.length > 0) {
-                    const errorLineMatch = relevantStackLines[0].match(/user-code\.js:(\d+)/);
-                    if (errorLineMatch) {
-                        const errorLine = parseInt(errorLineMatch[1]) - 3;  // Adjust for wrapper
-                        const lines = code.split('\n');
-                        const contextLines = lines.slice(Math.max(0, errorLine - 2), errorLine + 3);
-                        const errorMessage = `
-Error: ${error.message}
-Near line ${errorLine + 1}:
-${contextLines.map((line, i) => `${errorLine - 1 + i}: ${line}`).join('\n')}
-                        `;
-                        this.log(errorMessage);
-                        throw new Error(errorMessage);
-                    }
-                }
-            }
-
             throw error;
         } finally {
             await this.saveLogs(env);
         }
     }
+
+
+
 
     async installPackage(packageName: string, env: NotebookEnvironment): Promise<void> {
         if (this.packageCache.has(packageName)) {

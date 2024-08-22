@@ -36,6 +36,11 @@ export class Cell {
         return this.performanceData;
     }
 
+    setContent(newContent: string) {
+        this.content = newContent;
+    }
+
+
     async execute(env: NotebookEnvironment): Promise<void> {
         this.clearOutputs();
         this.addOutput({ type: 'loader', content: 'Executing cell...' });

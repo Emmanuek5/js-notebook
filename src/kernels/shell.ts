@@ -1,23 +1,27 @@
 import { Kernel } from './kernel';
-import { NotebookEnvironment } from '@/notebook-environment';
+import { NotebookEnvironment } from '../notebook-environment';
 import path from 'path';
 
 export class ShellKernel implements Kernel {
-    initialize(): Promise<void> {
-        throw new Error('Method not implemented.');
-    }
-    shutdown(): Promise<void> {
-        throw new Error('Method not implemented.');
-    }
     private forbiddenCommands: string[] = [
-        'rm', 'mv', 'cp', 'chmod', 'chown', 'sudo', 'su',
-        'wget', 'curl', 'ping', 'nmap', 'nc', 'netcat'
+        // Add any commands you want to forbid for security reasons
     ];
 
-    public getName() { 
+    public getName() {
         return 'Shell';
     }
-    async execute(command: string, env: NotebookEnvironment): Promise<string> {
+
+    async initialize(): Promise<void> {
+        // Any initialization logic for the Shell kernel can go here
+        return;
+    }
+
+    async shutdown(): Promise<void> {
+        // Any shutdown logic for the Shell kernel can go here
+        return;
+    }
+
+    async execute(command: string, env: NotebookEnvironment): Promise<{ output: string; error?: string }> {
         this.validateCommand(command);
 
         const notebookDir = env.directory;
@@ -36,16 +40,18 @@ export class ShellKernel implements Kernel {
             const stdout = await new Response(proc.stdout).text();
             const stderr = await new Response(proc.stderr).text();
 
-            const output = stdout + (stderr ? `\nError: ${stderr}` : '');
+            const output = stdout.trim();
+            const error = stderr.trim();
 
             if (await proc.exited && proc.exitCode !== 0) {
-                throw new Error(`Command failed with exit code ${proc.exitCode}.\n${output}`);
+                // If the command fails, return the error instead of throwing it
+                return { output, error: `Command failed with exit code ${proc.exitCode}.\n${error}` };
             }
 
-            return output.trim();
-        } catch (error) {
-            console.error('Error executing shell command:', error);
-            throw error;
+            // If command was successful but there was an error message, return it too
+            return { output, error: error ? error : undefined };
+        } catch (error: any) {
+            return { output: '', error: `Shell execution error: ${error.message}` };
         }
     }
 
@@ -61,6 +67,9 @@ export class ShellKernel implements Kernel {
     }
 
     async installPackage(packageName: string, env: NotebookEnvironment): Promise<void> {
-        await this.execute(`bun add ${packageName}`, env);
+        const result = await this.execute(`bun add ${packageName}`, env);
+        if (result.error) {
+            throw new Error(result.error);
+        }
     }
 }

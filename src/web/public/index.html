@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Notebook Interface</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet">
+    <style>
+        .cell-content {
+            transition: all 0.3s ease;
+        }
+        .cell-content:hover {
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans">
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-blue-600 text-white h-screen p-4 shadow-md overflow-y-auto custom-scrollbar">
+            <h2 class="text-2xl font-bold mb-4">Notebook Sidebar</h2>
+            <ul class="space-y-4">
+                <li>
+                    <button id="notebookTab" class="w-full text-left px-4 py-2 bg-blue-500 rounded-md hover:bg-blue-700 transition duration-300 ease-in-out">
+                        <i class="fas fa-book mr-2"></i>Notebook
+                    </button>
+                </li>
+                <li>
+                    <button id="fileManagerTab" class="w-full text-left px-4 py-2 bg-blue-500 rounded-md hover:bg-blue-700 transition duration-300 ease-in-out">
+                        <i class="fas fa-folder mr-2"></i>File Manager
+                    </button>
+                </li>
+                <li>
+                    <button id="installedPackagesTab" class="w-full text-left px-4 py-2 bg-blue-500 rounded-md hover:bg-blue-700 transition duration-300 ease-in-out">
+                        <i class="fas fa-box mr-2"></i>Installed Packages
+                    </button>
+                </li>
+                <li>
+                    <button id="envsTab" class="w-full text-left px-4 py-2 bg-blue-500 rounded-md hover:bg-blue-700 transition duration-300 ease-in-out">
+                        <i class="fas fa-cog mr-2"></i>Envs
+                    </button>
+                </li>
+            </ul>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <nav class="bg-blue-600 text-white p-4 shadow-md">
+                <div class="container mx-auto flex justify-between items-center">
+                    <h1 class="text-2xl font-bold">Notebook Interface</h1>
+                    <button id="saveNotebook" class="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition duration-300 ease-in-out">
+                        <i class="fas fa-save mr-2"></i>Save Notebook
+                    </button>
+                </div>
+            </nav>
+
+            <div class="flex-1 overflow-y-auto p-6 custom-scrollbar">
+                <!-- Notebook Content -->
+                <div id="notebookContent">
+                    <div id="cells" class="space-y-6 mb-8"></div>
+
+                    <div class="bg-white rounded-lg shadow-lg p-6">
+                        <h2 class="text-2xl font-semibold text-blue-600 mb-4">Create a New Cell</h2>
+                        <form id="newCellForm" class="space-y-4">
+                            <div class="form-group">
+                                <label for="kernel" class="block text-lg font-medium text-gray-700 mb-2">Kernel:</label>
+                                <select id="kernel" name="kernel" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 transition duration-300 ease-in-out">
+                                    <option value="javascript">JavaScript</option>
+                                    <option value="shell">Shell</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="content" class="block text-lg font-medium text-gray-700 mb-2">Content:</label>
+                                <textarea id="content" name="content" rows="5" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 transition duration-300 ease-in-out custom-scrollbar"></textarea>
+                            </div>
+                            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-300 ease-in-out">
+                                <i class="fas fa-plus mr-2"></i>Create Cell
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- File Manager Content -->
+                <div id="fileManagerContent" class="hidden">
+                    <h2 class="text-2xl font-semibold text-blue-600 mb-4">File Manager</h2>
+                    <div id="filesList" class="bg-white p-4 rounded-lg shadow-lg mb-4"></div>
+                    <button id="createFile" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-300 ease-in-out">
+                        <i class="fas fa-file-alt mr-2"></i>Create New File
+                    </button>
+                </div>
+
+                <!-- Installed Packages Content -->
+                <div id="installedPackagesContent" class="hidden">
+                    <h2 class="text-2xl font-semibold text-blue-600 mb-4">Installed Packages</h2>
+                    <div id="packagesList" class="bg-white p-4 rounded-lg shadow-lg mb-4"></div>
+                    <div class="bg-white rounded-lg shadow-lg p-6">
+                        <h3 class="text-xl font-semibold text-blue-600 mb-4">Install a Package</h3>
+                        <form id="installPackageForm" class="space-y-4">
+                            <div class="form-group">
+                                <label for="packageName" class="block text-lg font-medium text-gray-700 mb-2">Package Name:</label>
+                                <input type="text" id="packageName" name="packageName" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 transition duration-300 ease-in-out">
+                            </div>
+                            <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition duration-300 ease-in-out">
+                                <i class="fas fa-download mr-2"></i>Install Package
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Envs Content -->
+                <div id="envsContent" class="hidden">
+                    <h2 class="text-2xl font-semibold text-blue-600 mb-4">Environment Variables</h2>
+                    <div id="envsList" class="bg-white p-4 rounded-lg shadow-lg mb-4"></div>
+                    <button id="addEnv" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition duration-300 ease-in-out">
+                        <i class="fas fa-plus mr-2"></i>Add Environment Variable
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async function() {
+            await loadNotebook();
+            loadInstalledPackages();
+            loadEnvs();
+            loadFiles();
+        });
+
+        // Sidebar tab management
+        const tabs = {
+            notebookTab: 'notebookContent',
+            fileManagerTab: 'fileManagerContent',
+            installedPackagesTab: 'installedPackagesContent',
+            envsTab: 'envsContent'
+        };
+
+        for (const [tabId, contentId] of Object.entries(tabs)) {
+            document.getElementById(tabId).addEventListener('click', function() {
+                // Hide all content areas
+                Object.values(tabs).forEach(id => document.getElementById(id).classList.add('hidden'));
+                // Show the selected content area
+                document.getElementById(contentId).classList.remove('hidden');
+                // Update active tab styling
+                Object.keys(tabs).forEach(id => document.getElementById(id).classList.remove('bg-blue-700'));
+                this.classList.add('bg-blue-700');
+            });
+        }
+
+        // Set initial active tab
+        document.getElementById('notebookTab').click();
+
+        document.getElementById('newCellForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+            const kernel = document.getElementById('kernel').value;
+            const content = document.getElementById('content').value;
+
+            const response = await fetch('/api/cell', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ kernelName: kernel, content: content })
+            });
+
+            const result = await response.json();
+            if (response.ok) {
+                addCell(result.cellId, kernel, content);
+                document.getElementById('content').value = '';
+            } else {
+                showNotification('Error: ' + result.error, 'error');
+            }
+        });
+
+        document.getElementById('installPackageForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+            const packageName = document.getElementById('packageName').value;
+
+            const response = await fetch('/api/install', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ packageName: packageName })
+            });
+
+            const result = await response.json();
+            if (response.ok) {
+                showNotification(result.message, 'success');
+                document.getElementById('packageName').value = '';
+                loadInstalledPackages(); // Reload packages after installing
+            } else {
+                showNotification('Error: ' + result.error, 'error');
+            }
+        });
+
+        document.getElementById('saveNotebook').addEventListener('click', async function() {
+            const response = await fetch('/api/save', {
+                method: 'POST'
+            });
+
+            const result = await response.json();
+            if (response.ok) {
+                showNotification(result.message, 'success');
+            } else {
+                showNotification('Error: ' + result.error, 'error');
+            }
+        });
+
+        document.getElementById('createFile').addEventListener('click', async function() {
+            const fileName = prompt('Enter the file name:');
+            if (fileName) {
+                const response = await fetch('/api/file', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ filename: fileName, content: '' })
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    loadFiles();
+                    showNotification(result.message, 'success');
+                } else {
+                    showNotification('Error: ' + result.error, 'error');
+                }
+            }
+        });
+
+        document.getElementById('addEnv').addEventListener('click', async function() {
+            const envKey = prompt('Enter the environment variable key:');
+            const envValue = prompt('Enter the environment variable value:');
+            if (envKey && envValue) {
+                const response = await fetch('/api/envs', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ [envKey]: envValue })
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    loadEnvs();
+                    showNotification(result.message, 'success');
+                } else {
+                    showNotification('Error: ' + result.error, 'error');
+                }
+            }
+        });
+
+        async function loadNotebook() {
+            const response = await fetch('/notebook');
+            const notebook = await response.json();
+
+            notebook.cells.forEach(cell => {
+                addCell(cell.id, cell.kernel, cell.content, cell.outputs);
+            });
+        }
+
+        function addCell(cellId, kernel, content, outputs = []) {
+            const cellDiv = document.createElement('div');
+            cellDiv.className = 'cell bg-white p-6 rounded-lg shadow-lg transition duration-300 ease-in-out hover:shadow-xl';
+            cellDiv.innerHTML = `
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800">Cell ${cellId} (${kernel})</h3>
+                    <button onclick="executeCell('${cellId}')" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-300 ease-in-out">
+                        <i class="fas fa-play mr-2"></i>Run
+                    </button>
+                </div>
+                <pre id="cell-content-${cellId}" class="cell-content p-4 bg-gray-100 rounded-md text-gray-700 cursor-pointer custom-scrollbar">${content}</pre>
+                <div class="output mt-4 p-4 bg-gray-100 rounded-md text-gray-700 custom-scrollbar" id="output-${cellId}"></div>
+            `;
+            document.getElementById('cells').appendChild(cellDiv);
+
+            // Enable inline editing
+            document.getElementById(`cell-content-${cellId}`).addEventListener('click', function() {
+                enableEditing(cellId);
+            });
+
+            // Render any existing outputs
+            const outputDiv = document.getElementById(`output-${cellId}`);
+            outputs.forEach(output => {
+                if (output.type === 'text') {
+                    outputDiv.textContent += output.content + '\n';
+                } else if (output.type === 'html') {
+                    outputDiv.innerHTML += output.content + '\n';
+                }});
+        }
+
+        function enableEditing(cellId) {
+            const contentElement = document.getElementById(`cell-content-${cellId}`);
+            const currentContent = contentElement.textContent.trim();
+
+            const textArea = document.createElement('textarea');
+            textArea.className = 'w-full p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 custom-scrollbar';
+            textArea.value = currentContent;
+
+            contentElement.replaceWith(textArea);
+            textArea.focus();
+
+            // Save on blur or Ctrl+Enter key press
+            textArea.addEventListener('blur', () => saveContent(cellId, textArea));
+            textArea.addEventListener('keydown', (event) => {
+                if (event.ctrlKey && event.key === 'Enter') {
+                    event.preventDefault();
+                    textArea.blur();
+                }
+            });
+        }
+
+        async function saveContent(cellId, textArea) {
+            const newContent = textArea.value.trim();
+
+            const response = await fetch('/api/cell', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ cellId: cellId, content: newContent })
+            });
+
+            if (response.ok) {
+                const pre = document.createElement('pre');
+                pre.id = `cell-content-${cellId}`;
+                pre.className = 'cell-content p-4 bg-gray-100 rounded-md text-gray-700 cursor-pointer custom-scrollbar';
+                pre.textContent = newContent;
+
+                textArea.replaceWith(pre);
+
+                // Re-enable inline editing
+                pre.addEventListener('click', function() {
+                    enableEditing(cellId);
+                });
+
+                showNotification('Cell content saved successfully', 'success');
+            } else {
+                const result = await response.json();
+                showNotification('Error: ' + result.error, 'error');
+                // Restore original content in case of error
+                const pre = document.createElement('pre');
+                pre.id = `cell-content-${cellId}`;
+                pre.className = 'cell-content p-4 bg-gray-100 rounded-md text-gray-700 cursor-pointer custom-scrollbar';
+                pre.textContent = textArea.value;
+
+                textArea.replaceWith(pre);
+
+                pre.addEventListener('click', function() {
+                    enableEditing(cellId);
+                });
+            }
+        }
+
+        async function executeCell(cellId) {
+            const response = await fetch('/api/execute', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ cellId: cellId })
+            });
+
+            const result = await response.json();
+            const outputDiv = document.getElementById(`output-${cellId}`);
+            if (response.ok) {
+                outputDiv.innerHTML = ''; // Clear previous output
+                if (result.result && result.result.length > 0) {
+                    result.result.forEach(output => {
+                        if (output.type === 'text') {
+                            const pre = document.createElement('pre');
+                            pre.textContent = output.content;
+                            outputDiv.appendChild(pre);
+                        } else if (output.type === 'html') {
+                            outputDiv.innerHTML += output.content;
+                        }
+                    });
+                }
+                showNotification('Cell executed successfully', 'success');
+            } else {
+                outputDiv.textContent = 'Error: ' + result.error;
+                showNotification('Error executing cell', 'error');
+            }
+        }
+
+        async function loadInstalledPackages() {
+            const response = await fetch('/api/packages');
+            const data = await response.json();
+
+            const packagesList = document.getElementById('packagesList');
+            packagesList.innerHTML = '';
+
+            data.packages.forEach(pkg => {
+                const packageItem = document.createElement('div');
+                packageItem.className = 'p-2 bg-gray-100 rounded-md mb-2 shadow-sm flex justify-between items-center';
+                packageItem.innerHTML = `
+                    <span>${pkg}</span>
+                    <button onclick="uninstallPackage('${pkg}')" class="text-red-500 hover:text-red-700 transition duration-300 ease-in-out">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                `;
+                packagesList.appendChild(packageItem);
+            });
+        }
+
+        async function uninstallPackage(packageName) {
+            const confirmUninstall = confirm(`Are you sure you want to uninstall ${packageName}?`);
+            if (confirmUninstall) {
+                const response = await fetch(`/api/uninstall`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ packageName: packageName })
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    loadInstalledPackages();
+                    showNotification(result.message, 'success');
+                } else {
+                    showNotification('Error: ' + result.error, 'error');
+                }
+            }
+        }
+
+        async function loadEnvs() {
+            const response = await fetch('/api/envs');
+            const data = await response.json();
+
+            const envsList = document.getElementById('envsList');
+            envsList.innerHTML = '';
+
+            Object.entries(data.envs).forEach(([key, value]) => {
+                const envItem = document.createElement('div');
+                envItem.className = 'p-2 bg-gray-100 rounded-md mb-2 shadow-sm flex justify-between items-center';
+                envItem.innerHTML = `
+                    <span>${key}: ${value}</span>
+                    <button onclick="deleteEnv('${key}')" class="text-red-500 hover:text-red-700 transition duration-300 ease-in-out">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                `;
+                envsList.appendChild(envItem);
+            });
+        }
+
+        async function deleteEnv(envKey) {
+            const confirmDelete = confirm(`Are you sure you want to delete the environment variable ${envKey}?`);
+            if (confirmDelete) {
+                const response = await fetch(`/api/envs/${envKey}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    loadEnvs();
+                    showNotification(result.message, 'success');
+                } else {
+                    showNotification('Error: ' + result.error, 'error');
+                }
+            }
+        }
+
+        async function loadFiles() {
+            const response = await fetch('/api/files');
+            const data = await response.json();
+
+            const filesList = document.getElementById('filesList');
+            filesList.innerHTML = '';
+
+            data.files.forEach(file => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'p-2 bg-gray-100 rounded-md mb-2 shadow-sm flex justify-between items-center';
+                fileItem.innerHTML = `
+                    <span>${file}</span>
+                    <div>
+                        <button onclick="editFile('${file}')" class="text-blue-500 hover:text-blue-700 transition duration-300 ease-in-out mr-2">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button onclick="deleteFile('${file}')" class="text-red-500 hover:text-red-700 transition duration-300 ease-in-out">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </div>
+                `;
+                filesList.appendChild(fileItem);
+            });
+        }
+
+        async function editFile(fileName) {
+            const response = await fetch(`/api/file/${fileName}`);
+            const data = await response.json();
+
+            const newContent = prompt('Edit file content:', data.content);
+            if (newContent !== null) {
+                const updateResponse = await fetch(`/api/file/${fileName}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ content: newContent })
+                });
+
+                const result = await updateResponse.json();
+                if (updateResponse.ok) {
+                    showNotification(result.message, 'success');
+                } else {
+                    showNotification('Error: ' + result.error, 'error');
+                }
+            }
+        }
+
+        async function deleteFile(fileName) {
+            const confirmDelete = confirm(`Are you sure you want to delete ${fileName}?`);
+            if (confirmDelete) {
+                const response = await fetch(`/api/file/${fileName}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    loadFiles();
+                    showNotification(result.message, 'success');
+                } else {
+                    showNotification('Error: ' + result.error, 'error');
+                }
+            }
+        }
+
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = `fixed bottom-4 right-4 p-4 rounded-md text-white ${type === 'error' ? 'bg-red-500' : 'bg-green-500'} shadow-lg transition-opacity duration-300`;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                setTimeout(() => {
+                    document.body.removeChild(notification);
+                }, 300);
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

@@ -1,58 +1,149 @@
+import express, { Request, Response } from 'express';
+import bodyParser from 'body-parser';
 import { Notebook } from './notebook';
 import { JavaScriptKernel } from './kernels/javascript';
 import { ShellKernel } from './kernels/shell';
+import path from 'path';
 
-async function main() {
-  const notebook = new Notebook();
-  await notebook.initialize();
+const app = express();
+const port = 3000;
 
+// Middleware
+app.use(bodyParser.json());
+app.use(express.static('public'));
+
+// Create a new notebook instance
+const notebook = new Notebook();
+
+// Initialize the notebook environment
+notebook.initialize().then(() => {
   // Register kernels
-  const jsKernel = new JavaScriptKernel();
-  notebook.registerKernel('javascript', jsKernel);
-  notebook.addEnvs({
-    SOME_NOTEBOOK_SPECIFIC_VAR: "dwedewd"
-  });
+  notebook.registerKernel('javascript', new JavaScriptKernel());
+  notebook.registerKernel('shell', new ShellKernel());
 
-  // Create cells
-  const jsCellId = await notebook.createCell('javascript', `
-global.myArray = [1, 2, 3];
-console.log('This is a simple log.');
-    `);
+  // Load existing notebook if needed
+  notebook.loadNotebook('my_notebook.json');
+  console.log('Notebook environment initialized.');
+}).catch(console.error);
 
-  const jsCell2 = await notebook.createCell('javascript', `
-global.myArray; // This might render as a table
-    `);
+// Routes
+app.get('/', (req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
-  const jsCell3 = await notebook.createCell('javascript', `
-console.log('A simple string output.'); // This should render as plain text
-    `);
 
-  // Cell that creates and displays a table with danfo.js
-  const danfoCellId = await notebook.createCell('javascript', `
-const { dfd } = require('node-kernel'); // Assuming 'node-kernel' is the way you load your bundled libraries
+app.get("/notebook", (req: Request, res: Response) => {
+  res.json(notebook.getNotebook());
+});
 
-// Create a simple DataFrame
-const data = {
-    'Name': ['Alice', 'Bob', 'Charlie'],
-    'Age': [25, 30, 35],
-    'City': ['New York', 'Los Angeles', 'Chicago']
-};
-const df = new dfd.DataFrame(data);
+// Get environment variables
+app.get('/api/envs', async (req: Request, res: Response) => {
+  try {
+    const envs = notebook.getNotebook().environment;
+    res.json({ envs });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
 
-// Printing to console
-console.log(df.toString()); // Depending on your implementation, this might not render as a visual table in the notebook
+// Get installed packages
+app.get('/api/packages', async (req: Request, res: Response) => {
+  try {
+    const packages = notebook.getInstalledPackages();
+    res.json({ packages });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
 
-// Optionally, use df.plot if your environment supports it
-// df.plot('table').render(); // Uncomment if plots can be handled
-    `);
+// Get list of files
+app.get('/api/files', async (req: Request, res: Response) => {
+  try {
+    const files = await notebook.listFiles();
+    res.json({ files });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
 
-  // Execute cells
-  console.log("Executing JavaScript cell:");
-  await notebook.executeCell(jsCellId);
-  await notebook.executeCell(jsCell2);
-  await notebook.executeCell(jsCell3);
-  await notebook.executeCell(danfoCellId);  // Execute the danfo.js cell
-  await notebook.saveNotebook('my_notebook.json');
-}
+// Save a file
+app.post('/api/file', async (req: Request, res: Response) => {
+  const { filename, content } = req.body;
+  try {
+    await notebook.saveFile(filename, content);
+    res.json({ message: `File "${filename}" saved successfully.` });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
 
-main().catch(console.error);
+// Set environment variables
+app.post('/api/envs', async (req: Request, res: Response) => {
+  const envs = req.body;
+  try {
+    notebook.addEnvs(envs);
+    res.json({ message: 'Environment variables updated successfully.' });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// Get notebook metadata
+app.get('/api/metadata', async (req: Request, res: Response) => {
+  try {
+    const metadata = {
+      id: notebook.getId(),
+      environment: notebook.getNotebook().environment,
+    };
+    res.json({ metadata });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// Update a cell's content
+app.put('/api/cell', async (req: Request, res: Response) => {
+  const { cellId, content } = req.body;
+  try {
+    await notebook.updateCell(cellId, content);
+    res.json({ message: 'Cell updated successfully.' });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// Create a new cell
+app.post('/api/cell', async (req: Request, res: Response) => {
+  const { kernelName, content } = req.body;
+  try {
+    const cellId = await notebook.createCell(kernelName, content);
+    res.json({ cellId });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// Execute a cell
+app.post('/api/execute', async (req: Request, res: Response) => {
+  const { cellId } = req.body;
+  try {
+    const result = await notebook.executeCell(cellId);
+    res.json({ result });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// Save the notebook
+app.post('/api/save', async (req: Request, res: Response) => {
+  try {
+    await notebook.saveNotebook('my_notebook.json');
+    res.json({ message: 'Notebook saved successfully.' });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.listen(port, () => {
+  console.log(`Notebook server running at http://localhost:${port}`);
+});

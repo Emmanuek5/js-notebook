@@ -1,4 +1,4 @@
-import { mkdir, writeFile, readFile } from 'fs/promises';
+import { mkdir, writeFile, readFile, readdir } from 'fs/promises';
 import { join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { Kernel } from './kernels/kernel';
@@ -52,6 +52,16 @@ export class Notebook {
         }
     }
 
+
+    async updateCell(cellId: string, newContent: string): Promise<void> {
+        const cell = this.cells.find(c => c.getId() === cellId);
+        if (!cell) {
+            throw new Error(`Cell with id "${cellId}" not found`);
+        }
+
+        cell.setContent(newContent);  // Update the cell's content
+    }
+
     private async initializeBunProject() {
         const notebookDir = this.environment.directory;
 
@@ -77,6 +87,30 @@ export class Notebook {
         this.log(`Registered kernel: ${name}`, '🔧');
     }
 
+    async listFiles(): Promise<string[]> {
+        const files = await readdir(this.environment.directory);
+        return files;
+    }
+
+    async saveFile(filename: string, content: string): Promise<void> {
+        const filePath = join(this.environment.directory, filename);
+        await writeFile(filePath, content);
+        this.log(`File saved: ${filePath}`, '📄');
+    }
+
+    getNotebook() {
+        return {
+            id: this.id,
+            cells: this.cells.map(cell => ({
+                id: cell.getId(),
+                kernelName: cell.getKernelName(),
+                content: cell.content,
+                outputs: cell.getOutputs()
+            })),
+            environment: this.environment.getEnvs()  // Assuming getEnvs returns current environment settings
+        }
+    }
+
     async createCell(kernelName: string, content: string): Promise<string> {
         const kernel = this.kernels.get(kernelName);
         if (!kernel) {
@@ -87,7 +121,10 @@ export class Notebook {
         this.log(`Created new cell with ID: ${cell.getId()}`, '📝');
         return cell.getId();
     }
- 
+
+
+
+
     async executeCell(cellId: string): Promise<any> {
         const cell = this.cells.find(c => c.getId() === cellId);
         if (!cell) {
@@ -108,7 +145,7 @@ export class Notebook {
             // Calculate execution time and log performance
             const executionTime = endTime - startTime;
             this.log(`Execution time for cell ${cellId}: ${executionTime.toFixed(2)} ms`);
-            this.logPerformanceData(cellId, startTime, endTime, startMetrics, endMetrics);
+
 
             // Store performance data in the cell
             cell.setPerformanceData({
@@ -120,7 +157,7 @@ export class Notebook {
             });
 
             this.progressIndicator.stop(`Cell ${cellId} executed successfully`);
-            return result;
+            return cell.getOutputs();
         } catch (error) {
             this.progressIndicator.stop('Failed to execute cell');
             throw error;
@@ -226,7 +263,7 @@ export class Notebook {
         this.environment.setEnvs(stateData.environment);  // Assuming setEnvs sets environment variables
         this.log('Notebook state loaded from ' + filePath);
     }
-    
+
     async saveNotebook(filePath: string) {
         const notebookData = {
             id: this.id,
@@ -242,21 +279,22 @@ export class Notebook {
                     content: output.content,
                     metadata: output.metadata,
                 })),
-                performanceData: cell.getPerformanceData(),  // Include performance data here
             })),
+            installedPackages: Array.from(this.installedPackages) // Include installed packages
         };
 
         await writeFile(filePath, JSON.stringify(notebookData, null, 2));
         this.log(`Notebook saved to ${filePath}`, '💾');
     }
 
-
     async loadNotebook(filePath: string) {
         const notebookData = JSON.parse(await readFile(filePath, 'utf-8'));
 
         this.id = notebookData.id;
+        this.installedPackages = new Set(notebookData.installedPackages || []); // Load installed packages
+
         this.cells = notebookData.cells.map((cellData: any) => {
-            const kernel = this.kernels.get(cellData.kernel);
+            const kernel = this.kernels.get(cellData.kernel.toLowerCase());
             if (!kernel) {
                 throw new Error(`Kernel "${cellData.kernel}" not found`);
             }
@@ -269,6 +307,7 @@ export class Notebook {
 
         this.log(`Notebook loaded from ${filePath}`, '📂');
     }
+
 
     getInstalledPackages(): string[] {
         return Array.from(this.installedPackages);
